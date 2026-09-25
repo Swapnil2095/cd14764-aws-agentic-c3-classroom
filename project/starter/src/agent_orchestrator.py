@@ -46,6 +46,7 @@ import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
+from datetime import datetime, date
 
 # Ensure the parent directory is on sys.path so config.py and
 # bedrock_kb_retrieval.py are importable regardless of where this
@@ -241,12 +242,29 @@ You can:
 2. Retrieve a customer's account tier and profile.
 3. List all orders belonging to a customer.
 
+MANDATORY TOOL-USAGE RULES:
+- If the request contains an order ID, you MUST call check_order_status
+  using the provided customer ID and that order ID before responding.
+- If the request asks about the customer's account tier, membership,
+  customer profile, or return-window tier, you MUST call get_customer_tier.
+- If the request asks for the customer's orders or order history, you MUST
+  call list_customer_orders.
+- If more than one type of information is requested, call every required
+  DynamoDB tool before responding.
+- Never answer an order-status question from the text of the request alone.
+- Never assume or invent order details.
+- The DynamoDB tool result is the authoritative source of truth.
+
 IMPORTANT:
+- The Customer ID may already be supplied by the Orchestrator.
+- Use the supplied Customer ID directly.
+- Do NOT ask the customer to repeat the Customer ID.
 - Report facts exactly as returned by the database.
 - Do NOT decide whether an order is eligible for a return or refund.
 - Do NOT make policy decisions.
 - Do NOT invent missing information.
-- If information cannot be found, clearly say that it was not found.
+- If a required lookup returns no result, clearly say that the information
+  was not found.
 - Return concise, structured factual information for downstream agents.
 """
 
@@ -431,8 +449,13 @@ IMPORTANT:
 - Always retrieve the InventoryAgent facts from WorkflowState before making
   an eligibility decision.
 - Use the customer's tier to determine the applicable return window.
-- Use the order date and the current date to determine whether the order is
-  within the applicable window.
+- Use the estimated_delivery date from the verified InventoryAgent facts
+  as the delivery date for return-window calculation.
+- Use current_date provided by get_inventory_context as today's date.
+- Never infer, guess, or invent today's date.
+- Calculate the applicable return deadline from the verified
+  estimated_delivery date and the customer's return window.
+- Do not use order_date as a substitute when estimated_delivery is available.
 - Do not invent order or customer information.
 - Do not initiate a refund unless the request is eligible.
 - If required information is missing, clearly explain what is missing.
@@ -444,29 +467,31 @@ IMPORTANT:
 
     @tool
     def get_inventory_context(session_id: str) -> dict:
-        """
-        Read the WorkflowState to access facts gathered by the InventoryAgent.
-
-        Args:
-            session_id: The current session identifier
-
-        Returns:
-            The inventory_agent field from WorkflowState, or empty dict if not yet set
-        """
+        """Return the Inventory Agent facts already stored in WorkflowState."""
         state = _read_workflow_state(session_id)
 
         if not state:
             return {
-                'found': False,
-                'session_id': session_id,
-                'message': f'Workflow state was not found for session {session_id}.'
+                "found": False,
+                "message": "No workflow state found for this session.",
             }
 
+        inventory_result = state.get("inventory_agent", {})
+
         return {
-            'found': True,
-            'session_id': session_id,
-            'inventory_agent': state.get('inventory_agent', {}),
+            "found": True,
+            "session_id": session_id,
+            "customer_id": state.get("customer_id"),
+            "current_date": date.today().isoformat(),
+            "inventory_agent": inventory_result,
+            "instruction": (
+                "These are the verified facts returned by the Inventory Agent. "
+                "Use them directly. Do not ask the customer to repeat information "
+                "that is already present here. "
+                "Use current_date as today's date. Never infer or invent today's date."
+            ),
         }
+
 
     @tool
     def initiate_refund(customer_id: str, order_id: str, reason: str) -> dict:
@@ -809,8 +834,15 @@ def build_communication_agent() -> Agent:
     system_prompt = """
 You are the CommunicationAgent for NovaMart customer support.
 
-Your role is to compose the final customer-facing response using the
-information gathered by the other agents.
+Your role is to compose the final customer-facing response.
+
+For normal NovaMart customer-service requests, use the information
+gathered by the other agents and WorkflowState.
+
+For a simple arithmetic or calculation request, answer the calculation
+directly. These requests do not require order, account, policy, refund,
+or database information. Do not refuse a simple calculation merely
+because it is unrelated to a NovaMart order.
 
 You must:
 1. Always call get_full_workflow_context before composing the response.
@@ -822,11 +854,17 @@ You must:
    empathetic manner.
 5. If a refund or return was requested, clearly communicate the decision,
    status, and reference number when available.
-6. If required information is missing from WorkflowState, say that the
-   information is unavailable rather than making assumptions.
+6. If required NovaMart information is missing from WorkflowState, say that
+   the information is unavailable rather than making assumptions. This rule
+   does not apply to simple arithmetic or calculation requests.
 7. Do not perform database operations yourself. Use the information supplied
    through get_full_workflow_context.
 8. Return only the final customer-facing response.
+9. If the original request is a simple arithmetic or calculation question
+   and the Orchestrator intentionally skipped the specialist agents,
+   answer the calculation directly and clearly. Do not refuse the request
+   merely because it is not about an order, account, refund, or policy.
+   Show the calculation and provide the final answer.
 """
 
     @tool
@@ -984,7 +1022,20 @@ IMPORTANT ROUTING RULES:
 
         trace.step_start('inventory_agent')
 
-        result = inventory_agent(request)
+        #result = inventory_agent(request)
+        inventory_prompt = (
+            f"Customer ID: {customer_id}\n"
+            f"Original request: {request}\n\n"
+            "You are being called by the Orchestrator to retrieve verified facts.\n"
+            "If the original request contains an order ID, you MUST call "
+            "check_order_status using this Customer ID and the order ID from the "
+            "request before producing your response.\n"
+            "Do not answer an order-status or order-detail question without first "
+            "performing the DynamoDB lookup.\n"
+            "Use the Customer ID above when calling your DynamoDB tools.\n"
+            "Do not ask the customer for the Customer ID because it is already provided."
+        )
+        result = inventory_agent(inventory_prompt)
 
         result_text = str(result)
 
@@ -1064,7 +1115,22 @@ IMPORTANT ROUTING RULES:
 
         trace.step_start('refund_agent')
 
-        result = refund_agent(request)
+        #result = refund_agent(request)
+        refund_request = f"""
+        Session ID: {session_id}
+        Customer ID: {customer_id}
+
+        Customer request:
+        {request}
+
+        Use get_inventory_context({session_id}) first to retrieve the verified
+        Inventory Agent facts from WorkflowState.
+
+        Do not ask the customer for information that is already available in
+        WorkflowState.
+        """
+
+        result = refund_agent(refund_request)
 
         result_text = str(result)
 
