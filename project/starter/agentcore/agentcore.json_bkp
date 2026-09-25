@@ -47,22 +47,6 @@
           "value": "/aws/bedrock/agentcore/udacity-agentcore"
         },
         {
-          "name": "AGENT_LOG_LEVEL",
-          "value": "INFO"
-        },
-        {
-          "name": "AGENT_LOG_TO_CLOUDWATCH",
-          "value": "true"
-        },
-        {
-          "name": "AGENT_TRACING_ENABLED",
-          "value": "true"
-        },
-        {
-          "name": "AGENT_TRACE_SAMPLING_RATE",
-          "value": "1.0"
-        },
-        {
           "name": "GUARDRAIL_ID",
           "value": "dknker411j66"
         },
