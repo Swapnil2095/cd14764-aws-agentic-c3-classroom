@@ -1,0 +1,153 @@
+@Swapnil2095 ➜ /workspaces/cd14764-aws-agentic-c3-classroom/project/starter (main) $ python tests/test_agent.py all
+
+───────────────────────────────────────────────────────
+  Task 2 - Multi-Agent Orchestration
+───────────────────────────────────────────────────────
+  ✓ PASS [+5pts] build_inventory_agent() returns an Agent object
+  ✓ PASS [+5pts] InventoryAgent has 3 tools (3 found)
+  ✓ PASS [+5pts] build_policy_agent() returns an Agent object
+  ✓ PASS [+5pts] PolicyAgent has 1 tool (1 found)
+  ✓ PASS [+5pts] build_orchestrator_agent() returns an Agent object
+  ✓ PASS [+5pts] OrchestratorAgent has 5 routing tools (5 found)
+  ✓ PASS [+5pts] OrchestratorAgent uses config.ORCHESTRATOR_MODEL_ID (Claude Haiku 4.5 - correct for routing)
+  ✓ PASS [+5pts] Worker agents use config.WORKER_MODEL_ID (Claude Sonnet 4.5 - correct for reasoning)
+  ✓ PASS [+0pts] build_policy_agent() runs the retrievers with ThreadPoolExecutor
+
+───────────────────────────────────────────────────────
+  Task 3 - AgentCore Deployment + Guardrails
+───────────────────────────────────────────────────────
+  ✓ PASS [+5pts] Guardrail 'udacity-agentcore-guardrail' exists in Bedrock
+  ✓ PASS [+5pts] Guardrail content, PII, topic and word policies match the specification
+  ✓ PASS [+3pts] Guardrail version 4 is published and READY
+  ✓ PASS [+7pts] AgentCore Runtime is READY (PUBLIC / HTTP) with guardrail + KB environment variables
+
+───────────────────────────────────────────────────────
+  Task 4 - Memory
+───────────────────────────────────────────────────────
+  ✓ PASS [+5pts] AgentCore Memory udacity_agentcore_memory-dSllTrEqOe is ACTIVE
+  ✓ PASS [+5pts] Memory uses the SESSION_SUMMARY (summaryMemoryStrategy) strategy
+  ✓ PASS [+5pts] Memory eventExpiryDuration is 7 days
+
+───────────────────────────────────────────────────────
+  Task 5 - Bedrock Knowledge Bases
+───────────────────────────────────────────────────────
+  ✓ PASS [+5pts] RETURNS_KB_ID is set in environment (0XQWZKPGFO)
+  ✓ PASS [+0pts] Returns Knowledge Base is ACTIVE
+  ✓ PASS [+0pts] Returns KB uses amazon.titan-embed-text-v2:0
+  ✓ PASS [+0pts] Returns KB data source has a completed sync
+  ✓ PASS [+5pts] SHIPPING_KB_ID is set in environment (KOWYSWNPB1)
+  ✓ PASS [+0pts] Shipping Knowledge Base is ACTIVE
+  ✓ PASS [+0pts] Shipping KB uses amazon.titan-embed-text-v2:0
+  ✓ PASS [+0pts] Shipping KB data source has a completed sync
+  ✓ PASS [+5pts] WARRANTY_KB_ID is set in environment (WVMDMRFTWG)
+  ✓ PASS [+0pts] Warranty Knowledge Base is ACTIVE
+  ✓ PASS [+0pts] Warranty KB uses amazon.titan-embed-text-v2:0
+  ✓ PASS [+0pts] Warranty KB data source has a completed sync
+  ✓ PASS [+5pts] All three Knowledge Bases return passages for a policy question
+    [PARALLEL RETRIEVAL - START]  Spawning 3 sub-agents concurrently via ThreadPoolExecutor
+    ──────────────────────────────────────────────────────
+    +-- [SUB-AGENT 01]  ReturnsRetriever   KB-ID: 0XQWZKPGFO
+    +-- [SUB-AGENT 02]  ShippingRetriever  KB-ID: KOWYSWNPB1
+    +-- [SUB-AGENT 03]  WarrantyRetriever  KB-ID: WVMDMRFTWG
+    Retrieving in parallel... (sub-agent output suppressed - clean results printed sequentially after [END])
+
+Tool #1: retrieve_returns_policy
+
+Tool #1: retrieve_shipping_policy
+
+Tool #1: retrieve_warranty_policy
+
+Tool #2: retrieve_returns_policy
+
+Tool #2: retrieve_warranty_policy
+
+Tool #2: retrieve_shipping_policy
+Based on the ReturnsBased Policy knowledge base, here on the Shipping Policy knowledge base, hereBased's the information about premium customers:
+
+**Return Window for's on the warranty Premium Customers:**
+- Premium the information about policy information tier customers receive an ** premium retrievedextended 60-day return window**: customers: (compared
+
+**Return Window for Premium Customers
+
+**Return Window for Premium Customers to the:**
+Premium standard 30-day window for tier regular:** 
+Premium customers have tier customers) an customers have
+
+**Warranty for ** an Premium Customers:**
+- Premium **extended 60-day return window**. tier customers get
+
+**Warranty Period:**
+Theextended 60-day return window**. a **3-year warranty on electronics warranty period
+
+**Warranty for** (compared to the standard 1 depends Premium Customers:**
+Premium-year warranty) on the product tier customers receive a **3-year
+
+To warranty on electronics**.
+
+For type and qualify customer for Premium tier: comparison tier status, Standard tier customers have a 
+
+- **For30-day return window and, customers need a Premium to either 1-year warranty on electronics.:
+-
+
+To Customers Spend $500+ in a calendar qualify:** year, for Premium
+  - Electronics: ** OR
+- Place 20+ orders tier status3-year warranty** (automatic in a calendar year, customers need upgrade from
+
+Customers are to either standard automatically upgraded to Premium when they meet these spend) $500+ in a calendar year OR
+   place 20+ orders in a calendar
+- **For Standard Customers:** thresholds and receive an
+  - All email notification upon products: year. **1-year limited warranty** against upgrade. manufacturing defects
+  - Electronics: **2-year warranty**
+
+So as a premium customer, you get both a 60-day return window and a 3-year warranty on electronics.    ──────────────────────────────────────────────────────
+    [PARALLEL RETRIEVAL - END]  All 3 KBs responded  Elapsed: 8.9s
+
+    [SUB-AGENT 01]  ReturnsRetriever   KB: 0XQWZKPGFO
+      | Based on the Returns Policy knowledge base, here's the information about premium customers:
+      | **Return Window for Premium Customers:**
+      | - Premium tier customers receive an **extended 60-day return window** (compared to the standard 30-day window for regular customers)
+      | **Warranty for Premium Customers:**
+      | - Premium tier customers get a **3-year warranty on electronics** (compared to the standard 1-year warranty)
+      | To qualify for Premium tier status, customers need to either:
+      | - Spend $500+ in a calendar year, OR
+      | - Place 20+ orders in a calendar year
+      | Customers are automatically upgraded to Premium when they meet these thresholds and receive an email notification upon upgrade.
+
+    [SUB-AGENT 02]  ShippingRetriever  KB: KOWYSWNPB1
+      | Based on the Shipping Policy knowledge base, here's the information about premium customers:
+      | **Return Window for Premium Customers:** 
+      | Premium tier customers have an **extended 60-day return window**.
+      | **Warranty for Premium Customers:**
+      | Premium tier customers receive a **3-year warranty on electronics**.
+      | For comparison, Standard tier customers have a 30-day return window and a 1-year warranty on electronics.
+      | To qualify for Premium tier status, customers need to either spend $500+ in a calendar year OR place 20+ orders in a calendar year.
+
+    [SUB-AGENT 03]  WarrantyRetriever  KB: WVMDMRFTWG
+      | Based on the warranty policy information retrieved:
+      | **Return Window for Premium Customers:**
+      | Premium tier customers have an **extended 60-day return window**.
+      | **Warranty Period:**
+      | The warranty period depends on the product type and customer tier:
+      | - **For Premium Customers:**
+      |   - Electronics: **3-year warranty** (automatic upgrade from standard)
+      | - **For Standard Customers:**
+      |   - All products: **1-year limited warranty** against manufacturing defects
+      |   - Electronics: **2-year warranty**
+      | So as a premium customer, you get both a 60-day return window and a 3-year warranty on electronics.
+  ✓ PASS [+5pts] search_all_policies() returned combined results from the three retrievers (8.9s)
+
+───────────────────────────────────────────────────────
+  Task 6 - Observability
+───────────────────────────────────────────────────────
+  ✓ PASS [+10pts] CloudWatch logging enabled at INFO level → /aws/bedrock/agentcore/udacity-agentcore
+  ℹ INFO latest agent log stream: agentcore-runtime/localhost/2026-10-06/b43247bf (17 min ago)
+  ✓ PASS [+10pts] X-Ray tracing enabled: 100% sampling, Transaction Search → CloudWatch Logs (ACTIVE)
+  ℹ INFO 5 NovaMart trace(s) received by X-Ray in the last 6 hours - open CloudWatch → X-Ray traces → Service map for the screenshot
+
+═══════════════════════════════════════════════════════
+  Score: 120/120 pts (100%)
+═══════════════════════════════════════════════════════
+
+  🎉 Perfect score! All tasks complete.
+
+@Swapnil2095 ➜ /workspaces/cd14764-aws-agentic-c3-classroom/project/starter (main) $ 

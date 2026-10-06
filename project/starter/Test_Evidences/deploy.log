@@ -1,0 +1,93 @@
+@Swapnil2095 ➜ /workspaces/cd14764-aws-agentic-c3-classroom/project/starter (main) $ python src/agent_orchestrator.py deploy
+
+============================================================
+  Deploying Enterprise Multi-Agent System
+============================================================
+
+AgentCore CLI: 0.30.0 (/home/codespace/nvm/current/bin/agentcore)
+
+Step 1/6: Building agent graph...
+  All 5 agents initialized
+
+Step 2/6: Creating Bedrock Guardrail...
+Guardrail already exists: dknker411j66 (version: 4)
+
+Step 3/6: Deploying to AgentCore Runtime...
+  AWS Account: 110266378021  |  Region: us-east-1
+  Runtime: udacity_agentcore_runtime  |  CLI project: agentcore/agentcore.json (stack AgentCore-udacity-default)
+  Runtime already deployed - updating it: arn:aws:bedrock-agentcore:us-east-1:110266378021:runtime/udacity_agentcore_runtime-kqhsu251Um
+  Runtime code staged in build/runtime/ (6 files + pyproject.toml, entry point agent_orchestrator.py)
+  Running: agentcore deploy -y   (CLI 0.30.0, region us-east-1)
+✓ Load deployment target
+✓ Validate project
+✓ Sync CDK dependencies
+✓ Build CDK project
+✓ Synthesize CloudFormation
+✓ Check bootstrap status
+✓ Check stack status
+✓ Deploy to AWS
+✓ Persist deployment state
+✓ Persist deployment state
+
+✓ Deployed to 'default' (stack: AgentCore-udacity-default)
+
+Outputs:
+  ApplicationAgentAgentcoreRuntimeRuntimeIdOutput11AAB7A8: udacity_agentcore_runtime-kqhsu251Um
+  ApplicationAgentAgentcoreRuntimeRuntimeArnOutput82AE9F7C: arn:aws:bedrock-agentcore:us-east-1:110266378021:runtime/udacity_agentcore_runtime-kqhsu251Um
+  ApplicationAgentAgentcoreRuntimeRoleArnOutput1A532F46: arn:aws:iam::110266378021:role/udacity-agentcore-agentcore-role
+  StackNameOutput: AgentCore-udacity-default
+Next: agentcore invoke | agentcore status
+
+Log: agentcore/.cli/logs/deploy/deploy-20261006-145001.log
+  Runtime deployed: arn:aws:bedrock-agentcore:us-east-1:110266378021:runtime/udacity_agentcore_runtime-kqhsu251Um
+  Waiting for runtime status READY ready.
+
+Step 4/6: Configuring Memory...
+AgentCore Memory already exists: arn:aws:bedrock-agentcore:us-east-1:110266378021:memory/udacity_agentcore_memory-dSllTrEqOe
+
+Step 5/6: Configuring Observability...
+  Runtime environment written to agentcore/agentcore.json - applying with the AgentCore CLI
+  Running: agentcore deploy -y   (CLI 0.30.0, region us-east-1)
+✓ Load deployment target
+✓ Validate project
+✓ Sync CDK dependencies
+✓ Build CDK project
+✓ Synthesize CloudFormation
+✓ Check bootstrap status
+✓ Check stack status
+✓ Deploy to AWS
+✓ Persist deployment state
+✓ Persist deployment state
+
+✓ Deployed to 'default' (stack: AgentCore-udacity-default)
+
+Outputs:
+  ApplicationAgentAgentcoreRuntimeRuntimeIdOutput11AAB7A8: udacity_agentcore_runtime-kqhsu251Um
+  ApplicationAgentAgentcoreRuntimeRuntimeArnOutput82AE9F7C: arn:aws:bedrock-agentcore:us-east-1:110266378021:runtime/udacity_agentcore_runtime-kqhsu251Um
+  ApplicationAgentAgentcoreRuntimeRoleArnOutput1A532F46: arn:aws:iam::110266378021:role/udacity-agentcore-agentcore-role
+  StackNameOutput: AgentCore-udacity-default
+Next: agentcore invoke | agentcore status
+
+Log: agentcore/.cli/logs/deploy/deploy-20261006-145121.log
+  Waiting for runtime status READY ready.
+  CloudWatch logging enabled: INFO
+  X-Ray tracing enabled: 100% sampling
+
+Step 6/6: Deploying AgentCore Gateway...
+  [Skipped] Gateway: No configured Lambda tool functions are available.
+
+============================================================
+  Deployment Complete!
+============================================================
+
+  Add these to your .env file:
+  AGENTCORE_RUNTIME_ARN=arn:aws:bedrock-agentcore:us-east-1:110266378021:runtime/udacity_agentcore_runtime-kqhsu251Um
+  GUARDRAIL_ID=dknker411j66
+  GUARDRAIL_VERSION=4
+
+  Then try the deployed runtime:
+  python src/agent_orchestrator.py invoke "What is the return policy for premium customers?"
+  or with the CLI:  agentcore invoke "What is the return policy for premium customers?"
+  (agentcore status / agentcore logs show the deployed runtime and its logs)
+
+@Swapnil2095 ➜ /workspaces/cd14764-aws-agentic-c3-classroom/project/starter (main) $ 
