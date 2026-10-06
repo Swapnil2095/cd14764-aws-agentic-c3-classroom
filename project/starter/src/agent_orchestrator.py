@@ -991,8 +991,9 @@ IMPORTANT ROUTING RULES:
 6. For arithmetic-only questions:
    the Orchestrator itself MUST perform the calculation BEFORE calling
    CommunicationAgent.
-   Use calculate_arithmetic to calculate the requested value and store
-   the calculation result in WorkflowState.
+   Use the internal Orchestrator helper
+   `_calculate_arithmetic_for_request()` to calculate the requested value
+   and store the calculation result in WorkflowState.
    Do not ask CommunicationAgent to perform the calculation.
    CommunicationAgent only uses the stored calculation result to compose
    the final customer-facing wording.
