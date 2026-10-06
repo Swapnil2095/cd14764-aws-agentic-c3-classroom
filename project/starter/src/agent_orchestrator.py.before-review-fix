@@ -44,8 +44,6 @@ import sys
 import uuid
 import logging
 import threading
-import ast
-import operator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 from datetime import datetime, date
@@ -841,10 +839,10 @@ Your role is to compose the final customer-facing response.
 For normal NovaMart customer-service requests, use the information
 gathered by the other agents and WorkflowState.
 
-For a simple arithmetic or calculation request, use the calculation
-result already stored by the Orchestrator in WorkflowState. The
-Orchestrator performs the calculation before this agent is called.
-Do not independently calculate, recompute, or change the result.
+For a simple arithmetic or calculation request, answer the calculation
+directly. These requests do not require order, account, policy, refund,
+or database information. Do not refuse a simple calculation merely
+because it is unrelated to a NovaMart order.
 
 You must:
 1. Always call get_full_workflow_context before composing the response.
@@ -859,12 +857,14 @@ You must:
 6. If required NovaMart information is missing from WorkflowState, say that
    the information is unavailable rather than making assumptions. This rule
    does not apply to simple arithmetic or calculation requests.
-7. Do not perform database operations or calculations yourself. Use the
-   information supplied through get_full_workflow_context.
-8. For arithmetic requests, use the stored orchestrator_calculation result
-   as the source of truth and explain that result clearly without
-   recomputing it.
-9. Return only the final customer-facing response.
+7. Do not perform database operations yourself. Use the information supplied
+   through get_full_workflow_context.
+8. Return only the final customer-facing response.
+9. If the original request is a simple arithmetic or calculation question
+   and the Orchestrator intentionally skipped the specialist agents,
+   answer the calculation directly and clearly. Do not refuse the request
+   merely because it is not about an order, account, refund, or policy.
+   Show the calculation and provide the final answer.
 """
 
     @tool
@@ -964,54 +964,35 @@ IMPORTANT ROUTING RULES:
 
 1. ALWAYS call initialize_session FIRST for every customer request.
 
-2. For ORDER-STATUS, ORDER-DETAIL, ORDER-HISTORY, TRACKING, or DELIVERY
-   requests involving a specific order:
-   call route_to_inventory_agent FIRST to gather verified order facts,
-   then call route_to_refund_agent.
-   The required order-status sequence is:
-   InventoryAgent -> RefundAgent -> CommunicationAgent.
+2. For requests involving an order, order status, order history, or a
+   return/refund involving a specific order:
+   call route_to_inventory_agent FIRST to gather order facts.
 
-3. For RETURN or REFUND requests involving a specific order:
-   call route_to_inventory_agent FIRST, then call route_to_refund_agent.
-   RefundAgent must use the verified inventory information stored in
-   WorkflowState.
-
-4. For GENERAL POLICY questions about returns, shipping, warranties,
-   or NovaMart policy:
+3. For questions about returns, shipping, warranties, or policy:
    call route_to_policy_agent.
-   However, ACCOUNT-SPECIFIC and CUSTOMER-SPECIFIC questions must NEVER
-   be routed to PolicyAgent.
 
-5. For ACCOUNT, CUSTOMER ACCOUNT, CUSTOMER-TIER, MEMBERSHIP-TIER,
-   CUSTOMER PROFILE, or other customer-specific questions:
-   call route_to_inventory_agent.
-   NEVER call route_to_policy_agent for these questions.
-   InventoryAgent is the required source for customer/account facts.
+4. For a return/refund request:
+   call route_to_inventory_agent FIRST, then call route_to_refund_agent.
+   RefundAgent must use the inventory information stored in WorkflowState.
 
-6. For arithmetic-only questions:
-   the Orchestrator itself MUST perform the calculation BEFORE calling
-   CommunicationAgent.
-   Use calculate_arithmetic to calculate the requested value and store
-   the calculation result in WorkflowState.
-   Do not ask CommunicationAgent to perform the calculation.
-   CommunicationAgent only uses the stored calculation result to compose
-   the final customer-facing wording.
+5. For arithmetic-only questions:
+   skip InventoryAgent, PolicyAgent, and RefundAgent, but still call
+   CommunicationAgent LAST to produce the final response.
 
-7. ALWAYS call route_to_communication_agent LAST after all required worker
-   calls and/or the Orchestrator calculation have completed.
+6. ALWAYS call route_to_communication_agent LAST after all relevant worker
+   agents have completed.
 
-8. Never write the final customer response yourself. CommunicationAgent is
-   responsible only for composing the final customer-facing response.
+7. Never write the final customer response yourself. CommunicationAgent is
+   responsible for composing the final customer-facing response.
 
-9. Use WorkflowState as the shared source of accumulated information.
-   Each worker's result or Orchestrator calculation must be written back
-   to WorkflowState before the next dependent step is called.
+8. Use the WorkflowState as the shared source of accumulated information.
+   Each worker's result must be written back to WorkflowState before the
+   next dependent worker is called.
 
-10. Do not invent information. Route the request to the appropriate worker
-    and rely on verified worker results or the stored Orchestrator
-    calculation.
+9. Do not invent information. Route the request to the appropriate worker
+   and rely on the worker's returned information.
 
-11. Keep routing efficient. Do not call workers that are not relevant to
+10. Keep routing efficient. Do not call workers that are not relevant to
     the customer's request.
 """
 
@@ -1163,144 +1144,6 @@ IMPORTANT ROUTING RULES:
 
         return result_text
 
-    def _calculate_arithmetic_for_request(
-        session_id: str,
-        request: str,
-    ) -> Optional[str]:
-        """
-        Perform arithmetic for an arithmetic-only request before
-        CommunicationAgent is invoked.
-
-        This is intentionally an internal Orchestrator helper rather than
-        a separate @tool so the Orchestrator retains the five tools required
-        by the project test suite.
-        """
-        import re
-
-        text = request.lower()
-
-        # Example supported scenario:
-        # "How much would 5 items at $29.99 be with a 10% discount?"
-        match = re.search(
-            r'(\d+(?:\.\d+)?)\s+items?\s+at\s+\$?\s*(\d+(?:\.\d+)?)'
-            r'.*?(\d+(?:\.\d+)?)\s*%\s*discount',
-            text,
-        )
-
-        if match:
-            quantity = float(match.group(1))
-            unit_price = float(match.group(2))
-            discount = float(match.group(3))
-
-            subtotal = quantity * unit_price
-            discount_amount = subtotal * (discount / 100)
-            total = subtotal - discount_amount
-
-            if total.is_integer():
-                total_text = f"{total:.0f}"
-            else:
-                total_text = f"{total:.2f}"
-
-            calculation_record = (
-                f"Expression: {quantity:g} * {unit_price:g} * "
-                f"(1 - {discount:g}/100)\n"
-                f"Subtotal: ${subtotal:.2f}\n"
-                f"Discount: ${discount_amount:.2f}\n"
-                f"Result: ${total_text}"
-            )
-
-            state = _read_workflow_state(session_id)
-
-            if state:
-                old_version = state.get("version", 0)
-
-                _update_workflow_state(
-                    session_id,
-                    {
-                        "orchestrator_calculation": calculation_record
-                    },
-                    expected_version=old_version,
-                )
-
-            return calculation_record
-
-        # Support basic numeric expressions when the request explicitly
-        # contains a simple arithmetic expression.
-        expression_match = re.search(
-            r'(?<![\w.])'
-            r'(\d+(?:\.\d+)?\s*[+\-*/]\s*'
-            r'\d+(?:\.\d+)?(?:\s*[+\-*/]\s*\d+(?:\.\d+)?)*)'
-            r'(?![\w.])',
-            text,
-        )
-
-        if expression_match:
-            expression = expression_match.group(1)
-
-            try:
-                import ast
-                import operator
-
-                allowed_ops = {
-                    ast.Add: operator.add,
-                    ast.Sub: operator.sub,
-                    ast.Mult: operator.mul,
-                    ast.Div: operator.truediv,
-                }
-
-                def evaluate(node):
-                    if isinstance(node, ast.Expression):
-                        return evaluate(node.body)
-
-                    if isinstance(node, ast.Constant) and isinstance(
-                        node.value, (int, float)
-                    ):
-                        return node.value
-
-                    if isinstance(node, ast.BinOp) and type(node.op) in allowed_ops:
-                        left = evaluate(node.left)
-                        right = evaluate(node.right)
-
-                        if isinstance(node.op, ast.Div) and right == 0:
-                            raise ValueError("division by zero")
-
-                        return allowed_ops[type(node.op)](left, right)
-
-                    raise ValueError("unsupported arithmetic")
-
-                result = evaluate(ast.parse(expression, mode="eval"))
-
-                result_text = (
-                    f"{result:.2f}"
-                    if isinstance(result, float)
-                    else str(result)
-                )
-
-                calculation_record = (
-                    f"Expression: {expression}\n"
-                    f"Result: {result_text}"
-                )
-
-                state = _read_workflow_state(session_id)
-
-                if state:
-                    old_version = state.get("version", 0)
-
-                    _update_workflow_state(
-                        session_id,
-                        {
-                            "orchestrator_calculation": calculation_record
-                        },
-                        expected_version=old_version,
-                    )
-
-                return calculation_record
-
-            except Exception:
-                return None
-
-        return None
-
     @tool
     def route_to_communication_agent(
         session_id: str,
@@ -1327,28 +1170,14 @@ IMPORTANT ROUTING RULES:
 
         old_version = state.get('version', 0)
 
-        # The Orchestrator performs arithmetic BEFORE handing the
-        # request to CommunicationAgent. The result is stored in
-        # WorkflowState so CommunicationAgent only composes the wording.
-        calculation_result = _calculate_arithmetic_for_request(
-            session_id,
-            original_request,
-        )
-
         trace.step_start('communication_agent')
 
         prompt = (
             f"Customer ID: {customer_id}\n"
             f"Original request: {original_request}\n"
             f"Session ID: {session_id}\n"
-            + (
-                "Orchestrator calculation already performed:\n"
-                f"{calculation_result}\n"
-                if calculation_result
-                else ""
-            )
-            + "Compose the final customer-facing response using "
-              "get_full_workflow_context."
+            "Compose the final customer-facing response using "
+            "get_full_workflow_context."
         )
 
         result = communication_agent(prompt)
@@ -1410,7 +1239,7 @@ IMPORTANT ROUTING RULES:
             route_to_policy_agent,
             route_to_refund_agent,
             route_to_communication_agent,
-],
+        ],
     )
 
 # ═══════════════════════════════════════════════════════
@@ -1821,6 +1650,8 @@ def configure_observability(runtime_arn: str) -> None:
     - CloudWatch logging at INFO level
     - X-Ray tracing at 100% sampling
     """
+    runtime_id = runtime_arn.split("/")[-1]
+
     logging_configuration = {
         "cloudWatchConfig": {
             "logGroupName": config.AGENT_LOG_GROUP,
@@ -1834,9 +1665,9 @@ def configure_observability(runtime_arn: str) -> None:
     }
 
     try:
-        response = apply_observability_config(
-            runtime_arn,
-            logging_configuration,
+        response = agentcore_control.put_agent_runtime_logging_configuration(
+            agentRuntimeId=runtime_id,
+            loggingConfiguration=logging_configuration,
         )
 
         print("  CloudWatch logging enabled: INFO")
